@@ -1,65 +1,85 @@
-#!/bin/bash
+#!/bin/sh
+# m8a Default Dotfiles Installer
+
 set -e
 
-# Dotfiles Installation Script for Coder
+echo ">> Starting m8a default dotfiles setup..."
 
-DOTFILES_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-BRANCH="main" # or master, depending on repo default
+# Ensure ~/.config exists
+mkdir -p "$HOME/.config"
 
-echo "Starting dotfiles installation..."
+# --- 1. Dependencies ---
 
-# Check for ZSH
-if ! command -v zsh >/dev/null 2>&1; then
-    echo "ZSH is not installed. Installing..."
-    sudo apt-get update && sudo apt-get install -y zsh
+# Check for apt-get (Debian/Ubuntu)
+if [ -x "$(command -v apt-get)" ]; then
+    PACKAGES=""
+    if ! [ -x "$(command -v zsh)" ]; then
+        PACKAGES="$PACKAGES zsh"
+    fi
+    if ! [ -x "$(command -v curl)" ]; then
+        PACKAGES="$PACKAGES curl"
+    fi
+    if ! [ -x "$(command -v git)" ]; then
+        PACKAGES="$PACKAGES git"
+    fi
+
+    if [ -n "$PACKAGES" ]; then
+         echo ">> Installing missing packages: $PACKAGES"
+         sudo apt-get update && sudo apt-get install -y $PACKAGES
+    fi
 else
-    echo "ZSH is already installed."
+    echo ">> Warning: apt-get not found. Assuming dependencies (zsh, curl, git) are available."
 fi
 
-# Install GitHub CLI (gh)
-if ! command -v gh >/dev/null 2>&1; then
-    echo "GitHub CLI is not installed. Installing..."
-    (type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
-    && sudo mkdir -p -m 755 /etc/apt/keyrings \
-    && wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
-    && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-    && sudo apt update \
-    && sudo apt install gh -y
-else
-    echo "GitHub CLI is already installed."
-fi
-
-# Install Oh My Zsh (Non-interactive)
+# --- 2. Oh My Zsh ---
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
-    echo "Installing Oh My Zsh..."
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended --keep-zshrc
+    echo ">> Installing Oh My Zsh..."
+    # Unattended install
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 else
-    echo "Oh My Zsh is already installed."
+    echo ">> Oh My Zsh is already installed."
 fi
 
-# Install Starship (Non-interactive)
-if ! command -v starship >/dev/null 2>&1; then
-    echo "Installing Starship..."
-    sh -c "$(curl -fsSL https://starship.rs/install.sh)" -- -y
+# --- 3. Starship ---
+if ! command -v starship > /dev/null; then
+    echo ">> Installing Starship Prompt..."
+    mkdir -p "$HOME/.local/bin"
+    sh -c "$(curl -fsSL https://starship.rs/install.sh)" -- -y -b "$HOME/.local/bin"
 else
-    echo "Starship is already installed."
+    echo ">> Starship is already installed."
 fi
 
-# Backup existing .zshrc if it exists and isn't a symlink
-if [ -f "$HOME/.zshrc" ] && [ ! -L "$HOME/.zshrc" ]; then
-    echo "Backing up existing .zshrc..."
-    mv "$HOME/.zshrc" "$HOME/.zshrc.backup.$(date +%s)"
+# --- 4. Configuration Linking ---
+echo ">> Linking configurations..."
+
+# Get the directory where this script is located
+REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
+
+# Backup existing config if it's a file and not a symlink to our target
+backup_if_exists() {
+    target=$1
+    if [ -e "$target" ] && [ ! -L "$target" ]; then
+        echo ">> Backing up existing $target to $target.bak"
+        mv "$target" "$target.bak"
+    fi
+}
+
+backup_if_exists "$HOME/.zshrc"
+ln -sf "$REPO_ROOT/.zshrc" "$HOME/.zshrc"
+
+backup_if_exists "$HOME/.config/starship.toml"
+ln -sf "$REPO_ROOT/starship.toml" "$HOME/.config/starship.toml"
+
+# --- 5. Set Default Shell ---
+CURRENT_SHELL=$(basename "$SHELL")
+if [ "$CURRENT_SHELL" != "zsh" ]; then
+    echo ">> Changing default shell to zsh..."
+    # Attempt chsh if we have sudo or passwordless capability, might fail in some containers without sudo
+    if [ -x "$(command -v sudo)" ]; then
+        sudo chsh -s "$(which zsh)" "$USER" || echo ">> Warning: Failed to change shell. You may need to run 'chsh -s $(which zsh)' manually."
+    else
+        chsh -s "$(which zsh)" || echo ">> Warning: Failed to change shell. You may need to run 'chsh -s $(which zsh)' manually."
+    fi
 fi
 
-# Symlink .zshrc
-if [ -L "$HOME/.zshrc" ]; then
-    echo "Removing existing .zshrc symlink..."
-    rm "$HOME/.zshrc"
-fi
-
-echo "Symlinking .zshrc..."
-ln -s "$DOTFILES_DIR/zshrc" "$HOME/.zshrc"
-
-echo "Dotfiles installation complete!"
-echo "Please restart your shell or run 'zsh' to see changes."
+echo ">> m8a dotfiles setup complete! Restart your terminal or run 'zsh' to see changes."

@@ -3,6 +3,7 @@ echo "--- Loading ~/.zshrc ---"
 # set up paths
 export PATH=$PATH:/usr/local/bin
 export PATH=$PATH:/usr/local/go/bin
+export PATH="$HOME/.local/bin:$PATH"
 export LC_ALL="en_US.UTF-8"
 # Set GPG TTY for passphrase prompts
 export GPG_TTY=$(tty)
