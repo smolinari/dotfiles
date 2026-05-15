@@ -40,13 +40,14 @@ else
     echo ">> Oh My Zsh is already installed."
 fi
 
-# --- 3. Starship ---
-if ! command -v starship > /dev/null; then
-    echo ">> Installing Starship Prompt..."
-    mkdir -p "$HOME/.local/bin"
-    sh -c "$(curl -fsSL https://starship.rs/install.sh)" -- -y -b "$HOME/.local/bin"
+# --- 3. Spaceship Theme ---
+ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+if [ ! -d "$ZSH_CUSTOM/themes/spaceship-prompt" ]; then
+    echo ">> Installing Spaceship theme..."
+    git clone https://github.com/spaceship-prompt/spaceship-prompt.git "$ZSH_CUSTOM/themes/spaceship-prompt" --depth=1
+    ln -sf "$ZSH_CUSTOM/themes/spaceship-prompt/spaceship.zsh-theme" "$ZSH_CUSTOM/themes/spaceship.zsh-theme"
 else
-    echo ">> Starship is already installed."
+    echo ">> Spaceship theme is already installed."
 fi
 
 # --- 4. Configuration Linking ---
@@ -66,9 +67,6 @@ backup_if_exists() {
 
 backup_if_exists "$HOME/.zshrc"
 ln -sf "$REPO_ROOT/.zshrc" "$HOME/.zshrc"
-
-backup_if_exists "$HOME/.config/starship.toml"
-ln -sf "$REPO_ROOT/starship.toml" "$HOME/.config/starship.toml"
 
 # --- 5. Set Default Shell ---
 CURRENT_SHELL=$(basename "$SHELL")
